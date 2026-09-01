@@ -5,6 +5,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+
 public class ProductRequestDto {
 
     @NotBlank(message = "Product name is required")
@@ -15,8 +25,8 @@ public class ProductRequestDto {
     private String description;
 
     @NotNull(message = "Product price is required")
-    @DecimalMin(value = "0" , inclusive = false , message = "price must be greater than 0")
-    private double price;
+    @Min(value = 0, message = "Price must be non-negative")
+    private Double price;
 
     @NotNull(message = "Stock is required")
     @Min(value = 1, message = "Stock must have at least 1")

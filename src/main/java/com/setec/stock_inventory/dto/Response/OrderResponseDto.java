@@ -18,9 +18,9 @@ public class OrderResponseDto {
     private LocalDateTime orderDate;
     private BigDecimal totalAmount;
     private String status;
-    private int userId;
-    private String userName;
+    private Long userId;
+    private String username;
     private LocalDateTime updateAt;
-    private List<OrderItemResponseDto> orderItem;
+    private List<OrderItemResponseDto> orderItems;
 
 }

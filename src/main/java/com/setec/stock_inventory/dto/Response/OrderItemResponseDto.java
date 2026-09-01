@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 public class OrderItemResponseDto {
 
     private Long id;
-    private int productId;
+    private Long productId;
     private String productName;
     private int quantity;
-    private int price;
-    private double subTotal;
+    private Double price;
+    private Double subTotal;
 }
