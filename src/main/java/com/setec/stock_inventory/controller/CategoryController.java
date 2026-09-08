@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/categories")
 public class CategoryController {
-    private final CategoryService service;
+    private final CategoryService   service;
 
 
     public CategoryController(CategoryService categoryService) {
@@ -45,9 +45,9 @@ public class CategoryController {
     // POST create category: http://localhost:9090/api/categories
     @PostMapping
     public ResponseEntity<ApiResponse<CategoryResponseDto>> addCategory(@Valid @RequestBody CategoryRequestDto categoryRequestDto) {
-        CategoryResponseDto createdCategory = service.createCategory(categoryRequestDto);
+        CategoryResponseDto categoryResponse = service.createCategory(categoryRequestDto);
         return new ResponseEntity<>(
-                ApiResponse.success("Category created successfully", createdCategory),
+                ApiResponse.success("Category created successfully", categoryResponse),
                 HttpStatus.CREATED
         );
     }
