@@ -4,8 +4,6 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.setec.stock_inventory.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,35 +14,35 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CloudinaryService {
 
-    @Autowired
-    private Cloudinary cloudinary;
+    private final Cloudinary cloudinary;
 
-    // Upload
-    public Map uploadFile(MultipartFile file, String folderName) throws Exception {
-        if(file.isEmpty() || file == null){
-            throw new BadRequestException("File is empty, or missing file");
+    public Map<?, ?> uploadFile(MultipartFile file) {
+        return uploadFile(file, "stock_inventory/image");
+    }
+
+    public Map<?, ?> uploadFile(MultipartFile file, String folderName) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("File is empty or missing.");
         }
-        try{
+        try {
             return cloudinary.uploader()
                     .upload(
                             file.getBytes(),
-                            ObjectUtils.asMap("folder", "stock_inventory/image")                    );
-        }catch(IOException e){
-            throw new BadRequestException("Error while uploading image to cloudinary"+ e.getMessage());
-
+                            ObjectUtils.asMap("folder", folderName != null && !folderName.isBlank() ? folderName : "stock_inventory/image")
+                    );
+        } catch (IOException e) {
+            throw new BadRequestException("Failed to upload image to Cloudinary: " + e.getMessage());
         }
     }
 
-    //delete
-    public Map deleteFile(String publicId){
-        if(publicId == null || publicId.isEmpty()){
+    public Map deleteFile(String publicId) {
+        if (publicId == null || publicId.trim().isEmpty()) {
             return Map.of();
         }
-        try{
+        try {
             return cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-        }catch(IOException e){
-            throw new BadRequestException("Error while deleting image from cloudinary"+ e.getMessage());
+        } catch (IOException e) {
+            throw new BadRequestException("Failed to delete image from Cloudinary: " + e.getMessage());
         }
     }
-
 }
