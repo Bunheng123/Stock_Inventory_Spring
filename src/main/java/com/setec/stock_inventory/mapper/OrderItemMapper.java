@@ -14,8 +14,8 @@ public class OrderItemMapper {
                 .productId(item.getProduct() != null ? item.getProduct().getId() : null)
                 .productName(item.getProduct() != null ? item.getProduct().getName() : null)
                 .quantity(item.getQuantity())
-                .price((double) item.getPrice())
-                .subTotal((double) (item.getPrice() * item.getQuantity()))
+                .price(item.getPrice())
+                .subTotal(item.getPrice() * item.getQuantity())
                 .build();
     }
 
