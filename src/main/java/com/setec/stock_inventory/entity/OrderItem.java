@@ -18,13 +18,13 @@ public class OrderItem {
     @GeneratedValue (strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Min(value = 1,message = "Qty must be atleast 1")
+    @Min(value = 1,message = "Qty must be at least 1")
     private int quantity;
 
     @Column(nullable = false)
-    private int price;
+    private double price;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name="order_id",nullable = false)
     private Order order;
 

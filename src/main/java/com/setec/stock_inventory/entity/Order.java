@@ -25,7 +25,7 @@ public class Order {
     @CreationTimestamp
     private LocalDateTime orderDate;
 
-    private BigDecimal totalAmount;
+    private double totalAmount;
 
     private String status;
 
@@ -36,7 +36,7 @@ public class Order {
     @UpdateTimestamp
     private LocalDateTime updateDate;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL,fetch = FetchType.LAZY)
     private List<OrderItem> orderItems;
 
 }
