@@ -3,6 +3,7 @@ package com.setec.stock_inventory.mapper;
 import com.setec.stock_inventory.dto.Request.UserRequestDto;
 import com.setec.stock_inventory.dto.Response.UserResponseDto;
 import com.setec.stock_inventory.entity.User;
+import com.setec.stock_inventory.enums.Role;
 
 public class UserMapper {
     public static UserResponseDto toResponse(User user){
@@ -15,7 +16,7 @@ public class UserMapper {
                 .id(user.getId())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .role(user.getRole())
+                .role(user.getRole() != null ? user.getRole().name() : null)
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
@@ -25,11 +26,20 @@ public class UserMapper {
             return null;
         }
 
+        Role role = Role.STOCK;
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            try {
+                role = Role.valueOf(request.getRole().trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new com.setec.stock_inventory.exception.BadRequestException("Invalid role: " + request.getRole() + ". Must be ADMIN or STOCK");
+            }
+        }
+
         return User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(request.getPassword())
-                .role(request.getRole())
+                .role(role)
                 .build();
     }
 }

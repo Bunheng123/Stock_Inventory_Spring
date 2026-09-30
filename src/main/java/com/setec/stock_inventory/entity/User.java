@@ -1,5 +1,6 @@
 package com.setec.stock_inventory.entity;
 
+import com.setec.stock_inventory.enums.Role;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,7 +31,9 @@ public class User {
     @Column(length = 100)
     private String password;
 
-    private String role;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
 
     @CreationTimestamp
     private LocalDateTime createdAt;
