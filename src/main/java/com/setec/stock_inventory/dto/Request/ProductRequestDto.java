@@ -29,7 +29,7 @@ public class ProductRequestDto {
     private Double price;
 
     @NotNull(message = "Stock is required")
-    @Min(value = 1, message = "Stock must have at least 1")
+    @Min(value = 0, message = "Stock cannot be negative")
     private Integer stock;
 
     @NotNull(message = "Category ID is required")
