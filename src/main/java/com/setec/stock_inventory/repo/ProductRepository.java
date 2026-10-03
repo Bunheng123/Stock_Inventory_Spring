@@ -12,10 +12,19 @@ import org.springframework.stereotype.Repository;
 @Repository 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    List<Product> findByCategoryId(Long categoryId); 
+    List<Product> findByCategoryId(Long categoryId);
+
+    List<Product> findByCategoryIdAndActiveTrue(Long categoryId);
+
+    @EntityGraph(attributePaths = {"category"})
+    @Query("SELECT p FROM Product p WHERE p.active = true")
+    List<Product> findAllWithDetails();
 
     @EntityGraph(attributePaths = {"category"})
     @Query("SELECT p FROM Product p")
-    List<Product> findAllWithDetails();    
+    List<Product> findAllIncludingInactiveWithDetails();
 
+    @EntityGraph(attributePaths = {"category"})
+    @Query("SELECT p FROM Product p WHERE p.active = true AND p.stock <= p.reorderLevel")
+    List<Product> findLowStockProducts();
 }

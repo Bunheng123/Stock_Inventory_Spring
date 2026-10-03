@@ -1,8 +1,9 @@
 package com.setec.stock_inventory.service;
 
+import com.setec.stock_inventory.dto.Request.UserProfileUpdateRequestDto;
 import com.setec.stock_inventory.dto.Request.UserRequestDto;
 import com.setec.stock_inventory.dto.Response.UserResponseDto;
-import com.setec.stock_inventory.entity.User;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -17,7 +18,10 @@ public interface UserService {
     UserResponseDto updateUser(Long id, UserRequestDto request);
 
     void deleteUser(Long id);
-    
-    
-    
+
+    UserResponseDto getCurrentUserProfile();
+
+    UserResponseDto updateCurrentUserProfile(UserProfileUpdateRequestDto request);
+
+    UserResponseDto updateCurrentUserProfilePicture(MultipartFile file);
 }

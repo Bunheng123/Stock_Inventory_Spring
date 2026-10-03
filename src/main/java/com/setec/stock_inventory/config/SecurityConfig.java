@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -18,7 +19,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -80,16 +80,53 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        // Products and Categories: full CRUD (including DELETE) allowed for both ADMIN and STOCK
+                        // Low stock endpoint: inventory management, ADMIN and STOCK only
+                        .requestMatchers(HttpMethod.GET, "/api/products/low-stock").hasAnyRole("ADMIN", "STOCK")
+                        // Product & Category browsing: public to everyone including anonymous
                         .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/categories",
                                 "/api/categories/**",
+                                "/api/products",
+                                "/api/products/**"
+                        ).permitAll()
+                        // Product & Category management (create, update, delete, stock adjust/in/out, images): ADMIN and STOCK only
+                        .requestMatchers(
+                                "/api/categories",
+                                "/api/categories/**",
+                                "/api/products",
                                 "/api/products/**"
                         ).hasAnyRole("ADMIN", "STOCK")
-                        // All other resources (Orders, Users) are restricted to ADMIN only
+                        // Suppliers: all methods allowed for ADMIN and STOCK only
+                        .requestMatchers("/api/suppliers/**").hasAnyRole("ADMIN", "STOCK")
+                        // Purchase Orders: all methods allowed for ADMIN and STOCK only
+                        .requestMatchers("/api/purchase-orders/**").hasAnyRole("ADMIN", "STOCK")
+                        // Stock Movements: read endpoints allowed for ADMIN and STOCK only
+                        .requestMatchers("/api/stock-movements/**").hasAnyRole("ADMIN", "STOCK")
+                        // Cart: USER only
+                        .requestMatchers("/api/cart", "/api/cart/**").hasRole("USER")
+                        // Order payment status: ADMIN only
+                        .requestMatchers(HttpMethod.PUT, "/api/orders/*/payment-status").hasRole("ADMIN")
+                        // Order self-cancellation: USER only
+                        .requestMatchers(HttpMethod.POST, "/api/orders/*/cancel").hasRole("USER")
+                        // User's own orders: USER (and staff)
+                        .requestMatchers(HttpMethod.GET, "/api/orders/my").hasAnyRole("ADMIN", "STOCK", "USER")
+                        // Specific order view: ADMIN, STOCK, USER (service checks ownership for USER)
+                        .requestMatchers(HttpMethod.GET, "/api/orders/*").hasAnyRole("ADMIN", "STOCK", "USER")
+                        // Orders: all other methods/endpoints allowed for ADMIN and STOCK only
                         .requestMatchers(
-                                "/api/orders/**",
-                                "/api/users/**"
-                        ).hasRole("ADMIN")
+                                "/api/orders",
+                                "/api/orders/**"
+                        ).hasAnyRole("ADMIN", "STOCK")
+                        // Wholesale Buyers: all methods allowed for ADMIN and STOCK only
+                        .requestMatchers("/api/wholesale-buyers/**").hasAnyRole("ADMIN", "STOCK")
+                        // Wholesale Orders: all methods allo
+                        // wed for ADMIN and STOCK only
+                        .requestMatchers("/api/wholesale-orders/**").hasAnyRole("ADMIN", "STOCK")
+                        // Any authenticated user can manage their own profile
+                        .requestMatchers("/api/users/me", "/api/users/me/**").authenticated()
+                        // Managing all other users (creating, listing, deleting) remains ADMIN only
+                        .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

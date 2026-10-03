@@ -17,6 +17,10 @@ public class ProductResponseDto {
     private String imageUrl;
     private String publicId;
     private int stock;
+    private boolean active;
+    private Double costPrice;
+    private int reorderLevel;
     private Long categoryId;
     private String categoryName;
+    private java.util.List<String> galleryImageUrls;
 }

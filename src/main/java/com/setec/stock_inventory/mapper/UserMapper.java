@@ -4,11 +4,12 @@ import com.setec.stock_inventory.dto.Request.UserRequestDto;
 import com.setec.stock_inventory.dto.Response.UserResponseDto;
 import com.setec.stock_inventory.entity.User;
 import com.setec.stock_inventory.enums.Role;
+import com.setec.stock_inventory.exception.BadRequestException;
 
 public class UserMapper {
-    public static UserResponseDto toResponse(User user){
 
-        if(user==null){
+    public static UserResponseDto toResponse(User user) {
+        if (user == null) {
             return null;
         }
 
@@ -17,21 +18,27 @@ public class UserMapper {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole() != null ? user.getRole().name() : null)
+                .fullName(user.getFullName())
+                .profileImageUrl(user.getProfileImageUrl())
+                .profilePublicId(user.getProfilePublicId())
+                .phone(user.getPhone())
+                .address(user.getAddress())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
     }
-    public static User toEntity(UserRequestDto request){
-        if(request==null){
+
+    public static User toEntity(UserRequestDto request) {
+        if (request == null) {
             return null;
         }
 
-        Role role = Role.STOCK;
+        Role role = Role.USER;
         if (request.getRole() != null && !request.getRole().isBlank()) {
             try {
                 role = Role.valueOf(request.getRole().trim().toUpperCase());
             } catch (IllegalArgumentException e) {
-                throw new com.setec.stock_inventory.exception.BadRequestException("Invalid role: " + request.getRole() + ". Must be ADMIN or STOCK");
+                throw new BadRequestException("Invalid role: " + request.getRole() + ". Must be ADMIN, STOCK, or USER");
             }
         }
 

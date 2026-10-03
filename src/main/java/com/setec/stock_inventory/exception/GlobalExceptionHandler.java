@@ -33,6 +33,14 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAccessDeniedException(org.springframework.security.access.AccessDeniedException ex) {
+        return new ResponseEntity<>(
+                ApiResponse.error("Forbidden: " + ex.getMessage()),
+                HttpStatus.FORBIDDEN
+        );
+    }
+
     // handle validation, special in request
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Map<String,String>>> handleMethodArgumentNotValidException(

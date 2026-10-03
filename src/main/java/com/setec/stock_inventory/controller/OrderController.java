@@ -3,6 +3,7 @@ package com.setec.stock_inventory.controller;
 import com.setec.stock_inventory.dto.ApiResponse;
 import com.setec.stock_inventory.dto.Request.OrderRequestDto;
 import com.setec.stock_inventory.dto.Request.OrderStatusRequestDto;
+import com.setec.stock_inventory.dto.Request.PaymentStatusRequestDto;
 import com.setec.stock_inventory.dto.Response.OrderResponseDto;
 import com.setec.stock_inventory.service.OrderService;
 import jakarta.validation.Valid;
@@ -31,7 +32,15 @@ public class OrderController {
         );
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/my")
+    public ResponseEntity<ApiResponse<List<OrderResponseDto>>> getMyOrders() {
+        List<OrderResponseDto> orders = orderService.getMyOrders();
+        return ResponseEntity.ok(
+                ApiResponse.success("My orders retrieved successfully", orders)
+        );
+    }
+
+    @GetMapping("/{id:[0-9]+}")
     public ResponseEntity<ApiResponse<OrderResponseDto>> getOrderById(@PathVariable Long id) {
         OrderResponseDto order = orderService.getOrderById(id);
         return ResponseEntity.ok(
@@ -47,7 +56,7 @@ public class OrderController {
         );
     }
 
-    @GetMapping("/user/{userId}")
+    @GetMapping("/user/{userId:[0-9]+}")
     public ResponseEntity<ApiResponse<List<OrderResponseDto>>> getOrdersByUserId(@PathVariable Long userId) {
         List<OrderResponseDto> orders = orderService.getOrdersByUserId(userId);
         return ResponseEntity.ok(
@@ -55,7 +64,7 @@ public class OrderController {
         );
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{id:[0-9]+}")
     public ResponseEntity<ApiResponse<OrderResponseDto>> updateOrderStatus(
             @PathVariable Long id,
             @Valid @RequestBody OrderStatusRequestDto request
@@ -65,5 +74,22 @@ public class OrderController {
                 ApiResponse.success("Order status updated successfully", order)
         );
     }
-}
 
+    @PostMapping("/{id:[0-9]+}/cancel")
+    public ResponseEntity<ApiResponse<OrderResponseDto>> selfCancelOrder(@PathVariable Long id) {
+        OrderResponseDto order = orderService.selfCancelOrder(id);
+        return ResponseEntity.ok(
+                ApiResponse.success("Order cancelled successfully", order)
+        );
+    }
+
+    @PutMapping("/{id:[0-9]+}/payment-status")
+    public ResponseEntity<ApiResponse<OrderResponseDto>> updatePaymentStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody PaymentStatusRequestDto request) {
+        OrderResponseDto order = orderService.updatePaymentStatus(id, request.getPaymentStatus());
+        return ResponseEntity.ok(
+                ApiResponse.success("Payment status updated successfully", order)
+        );
+    }
+}

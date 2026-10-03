@@ -32,6 +32,12 @@ public class ProductRequestDto {
     @Min(value = 0, message = "Stock cannot be negative")
     private Integer stock;
 
+    @Min(value = 0, message = "Cost price must be non-negative")
+    private Double costPrice;
+
+    @Min(value = 0, message = "Reorder level cannot be negative")
+    private Integer reorderLevel;
+
     @NotNull(message = "Category ID is required")
     private Long categoryId;
 

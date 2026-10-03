@@ -2,13 +2,17 @@ package com.setec.stock_inventory.controller;
 
 import com.setec.stock_inventory.dto.ApiResponse;
 import com.setec.stock_inventory.dto.Request.ProductRequestDto;
+import com.setec.stock_inventory.dto.Request.StockAdjustmentRequestDto;
+import com.setec.stock_inventory.dto.Response.ProductImageResponseDto;
 import com.setec.stock_inventory.dto.Response.ProductResponseDto;
 import com.setec.stock_inventory.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 import java.util.List;
@@ -32,6 +36,40 @@ public class ProductController {
                 ApiResponse.success("Product created successfully", response),
                 HttpStatus.CREATED
         );
+    }
+
+    @GetMapping("/low-stock")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
+    public ResponseEntity<ApiResponse<List<ProductResponseDto>>> getLowStockProducts() {
+        List<ProductResponseDto> products = productService.getLowStockProducts();
+        return ResponseEntity.ok(ApiResponse.success("Low stock products retrieved successfully", products));
+    }
+
+    @PostMapping("/{id}/adjust-stock")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
+    public ResponseEntity<ApiResponse<ProductResponseDto>> adjustStock(
+            @PathVariable Long id,
+            @Valid @RequestBody StockAdjustmentRequestDto request) {
+        ProductResponseDto response = productService.adjustStock(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Stock adjusted successfully", response));
+    }
+
+    @PostMapping("/{id}/stock-in")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
+    public ResponseEntity<ApiResponse<ProductResponseDto>> stockIn(
+            @PathVariable Long id,
+            @Valid @RequestBody StockAdjustmentRequestDto request) {
+        ProductResponseDto response = productService.stockIn(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Stock added successfully", response));
+    }
+
+    @PostMapping("/{id}/stock-out")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
+    public ResponseEntity<ApiResponse<ProductResponseDto>> stockOut(
+            @PathVariable Long id,
+            @Valid @RequestBody StockAdjustmentRequestDto request) {
+        ProductResponseDto response = productService.stockOut(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Stock reduced successfully", response));
     }
 
     @GetMapping("/{id}")
@@ -65,6 +103,32 @@ public class ProductController {
     public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
+    }
+
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<ProductImageResponseDto>> addProductImage(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        ProductImageResponseDto response = productService.addProductImage(id, file);
+        return new ResponseEntity<>(
+                ApiResponse.success("Product image uploaded successfully", response),
+                HttpStatus.CREATED
+        );
+    }
+
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<ApiResponse<Void>> deleteProductImage(
+            @PathVariable Long id,
+            @PathVariable Long imageId) {
+        productService.deleteProductImage(id, imageId);
+        return ResponseEntity.ok(ApiResponse.success("Product image deleted successfully", null));
+    }
+
+    @GetMapping("/{id}/images")
+    public ResponseEntity<ApiResponse<List<ProductImageResponseDto>>> getProductImages(
+            @PathVariable Long id) {
+        List<ProductImageResponseDto> response = productService.getProductImages(id);
+        return ResponseEntity.ok(ApiResponse.success("Product images retrieved successfully", response));
     }
 }
 

@@ -40,12 +40,12 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Email already exists");
         }
 
-        // Public registration always assigns STOCK role to prevent privilege escalation
+        // Public registration always assigns USER role to prevent privilege escalation
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.STOCK)
+                .role(Role.USER)
                 .build();
 
         userRepository.save(user);

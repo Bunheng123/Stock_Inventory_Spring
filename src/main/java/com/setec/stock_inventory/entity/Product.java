@@ -37,6 +37,17 @@ public class Product {
     @Min(value = 0, message = "stock cannot be negative")
     private int stock;
 
+    @Builder.Default
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean active = true;
+
+    @Column(name = "cost_price")
+    private Double costPrice;
+
+    @Builder.Default
+    @Column(name = "reorder_level", nullable = false, columnDefinition = "int default 0")
+    private int reorderLevel = 0;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id" , nullable = false)
     private Category category;
@@ -44,4 +55,6 @@ public class Product {
     @OneToMany(mappedBy = "product")
     private List<OrderItem> orders;
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<ProductImage> galleryImages;
 }

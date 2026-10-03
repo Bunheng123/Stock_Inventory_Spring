@@ -35,12 +35,24 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @Column(name = "full_name", length = 100)
+    private String fullName;
+
+    @Column(name = "profile_image_url")
+    private String profileImageUrl;
+
+    @Column(name = "profile_public_id")
+    private String profilePublicId;
+
+    @Column(length = 20)
+    private String phone;
+
+    @Column(length = 255)
+    private String address;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
-
-
-
 }
