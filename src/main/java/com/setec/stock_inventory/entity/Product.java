@@ -34,7 +34,7 @@ public class Product {
 
     private String publicId;
 
-    @Min(value = 1 , message = "stock must have at least one")
+    @Min(value = 0, message = "stock cannot be negative")
     private int stock;
 
     @ManyToOne(fetch = FetchType.LAZY)

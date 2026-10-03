@@ -7,17 +7,23 @@ import com.setec.stock_inventory.dto.Response.OrderResponseDto;
 import com.setec.stock_inventory.entity.Order;
 import com.setec.stock_inventory.entity.OrderItem;
 import com.setec.stock_inventory.entity.Product;
+import com.setec.stock_inventory.entity.StockMovement;
 import com.setec.stock_inventory.entity.User;
+import com.setec.stock_inventory.enums.MovementType;
 import com.setec.stock_inventory.exception.BadRequestException;
 import com.setec.stock_inventory.exception.ResourceNotFoundException;
 import com.setec.stock_inventory.mapper.OrderMapper;
 import com.setec.stock_inventory.repo.OrderItemRepository;
 import com.setec.stock_inventory.repo.OrderRepository;
 import com.setec.stock_inventory.repo.ProductRepository;
+import com.setec.stock_inventory.repo.StockMovementRepository;
 import com.setec.stock_inventory.repo.UserRepository;
 import com.setec.stock_inventory.service.OrderService;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +39,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final StockMovementRepository stockMovementRepository;
 
 
     @Override
@@ -52,17 +59,21 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderItemRequestDto> orderItems = request.getOrderItemList();
         List<OrderItem> orderItemEntityList = new ArrayList<>();
+        List<StockMovement> stockMovements = new ArrayList<>();
+        User currentUser = getCurrentAuthenticatedUser();
 
         for (OrderItemRequestDto storeOrderItem : orderItems) {
             Product product = productRepository.findById(storeOrderItem.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Cannot find product with id: " + storeOrderItem.getProductId()));
 
             if (product.getStock() < storeOrderItem.getQuantity()) {
-                throw new BadRequestException("Product stock is not enough for product: " + product.getName());
+                throw new BadRequestException("Insufficient stock for product: " + product.getName()
+                        + ". Available: " + product.getStock() + ", Requested: " + storeOrderItem.getQuantity());
             }
 
             // new stock
-            int newStock = product.getStock() - storeOrderItem.getQuantity();
+            int previousStock = product.getStock();
+            int newStock = previousStock - storeOrderItem.getQuantity();
             product.setStock(newStock);
             productRepository.save(product);
 
@@ -77,12 +88,26 @@ public class OrderServiceImpl implements OrderService {
             orderItemEntityList.add(orderItem);
 
             totalAmount += subtotal;
+
+            stockMovements.add(StockMovement.builder()
+                    .product(product)
+                    .type(MovementType.STOCK_OUT)
+                    .quantity(storeOrderItem.getQuantity())
+                    .previousStock(previousStock)
+                    .newStock(newStock)
+                    .user(currentUser)
+                    .build());
         }
 
         order.setTotalAmount(totalAmount);
         order.setOrderItems(orderItemEntityList);
 
         Order saved = orderRepository.save(order);
+
+        for (StockMovement movement : stockMovements) {
+            movement.setReason("Order #" + saved.getId());
+            stockMovementRepository.save(movement);
+        }
 
         return OrderMapper.toResponse(saved);
     }
@@ -120,14 +145,37 @@ public class OrderServiceImpl implements OrderService {
         String newStatus = status.trim().toUpperCase();
         // Optional: If cancelling an order, return the stock back to products
         if ("CANCELLED".equals(newStatus) && !"CANCELLED".equals(order.getStatus())) {
+            User currentUser = getCurrentAuthenticatedUser();
             for (OrderItem item : order.getOrderItems()) {
                 Product product = item.getProduct();
-                product.setStock(product.getStock() + item.getQuantity());
+                int previousStock = product.getStock();
+                int newStock = previousStock + item.getQuantity();
+                product.setStock(newStock);
                 productRepository.save(product);
+
+                StockMovement movement = StockMovement.builder()
+                        .product(product)
+                        .type(MovementType.STOCK_IN)
+                        .quantity(item.getQuantity())
+                        .previousStock(previousStock)
+                        .newStock(newStock)
+                        .reason("Cancelled Order #" + order.getId())
+                        .user(currentUser)
+                        .build();
+                stockMovementRepository.save(movement);
             }
         }
         order.setStatus(newStatus);
         Order updated = orderRepository.save(order);
         return OrderMapper.toResponse(updated);
+    }
+
+    private User getCurrentAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated() && !(authentication instanceof AnonymousAuthenticationToken)) {
+            String username = authentication.getName();
+            return userRepository.findByUsername(username).orElse(null);
+        }
+        return null;
     }
 }
