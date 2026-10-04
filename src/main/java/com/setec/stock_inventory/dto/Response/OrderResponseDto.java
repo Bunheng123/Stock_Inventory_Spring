@@ -1,5 +1,6 @@
 package com.setec.stock_inventory.dto.Response;
 
+import com.setec.stock_inventory.enums.PaymentMethod;
 import com.setec.stock_inventory.enums.PaymentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +23,7 @@ public class OrderResponseDto {
     private String username;
     private String shippingAddress;
     private PaymentStatus paymentStatus;
+    private PaymentMethod paymentMethod;
     private String customerNote;
     private LocalDateTime updateAt;
     private List<OrderItemResponseDto> orderItems;
