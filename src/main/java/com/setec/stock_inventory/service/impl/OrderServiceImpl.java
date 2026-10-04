@@ -97,6 +97,7 @@ public class OrderServiceImpl implements OrderService {
                 .user(currentUser)
                 .shippingAddress(request.getShippingAddress())
                 .customerNote(request.getCustomerNote())
+                .paymentMethod(request.getPaymentMethod())
                 .paymentStatus(PaymentStatus.UNPAID)
                 .status("PENDING")
                 .orderDate(LocalDateTime.now())

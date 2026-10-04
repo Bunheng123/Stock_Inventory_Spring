@@ -19,6 +19,7 @@ import com.setec.stock_inventory.entity.Product;
 import com.setec.stock_inventory.entity.StockMovement;
 import com.setec.stock_inventory.entity.User;
 import com.setec.stock_inventory.enums.MovementType;
+import com.setec.stock_inventory.enums.PaymentMethod;
 import com.setec.stock_inventory.enums.PaymentStatus;
 import com.setec.stock_inventory.repo.CategoryRepository;
 import com.setec.stock_inventory.repo.OrderRepository;
@@ -293,6 +294,7 @@ public class CartAndCheckoutIntegrationTest {
         // Checkout
         CheckoutRequestDto checkoutDto = CheckoutRequestDto.builder()
                 .shippingAddress("123 Test Street, Phnom Penh")
+                .paymentMethod(PaymentMethod.CASH_ON_DELIVERY)
                 .customerNote("Please leave at front door")
                 .build();
 
@@ -307,6 +309,7 @@ public class CartAndCheckoutIntegrationTest {
         Long orderId = orderJson.get("id").asLong();
         assertEquals("PENDING", orderJson.get("status").asText());
         assertEquals("UNPAID", orderJson.get("paymentStatus").asText());
+        assertEquals("CASH_ON_DELIVERY", orderJson.get("paymentMethod").asText());
         assertEquals("123 Test Street, Phnom Penh", orderJson.get("shippingAddress").asText());
         assertEquals("Please leave at front door", orderJson.get("customerNote").asText());
         // 3 * 15 + 2 * 30 = 45 + 60 = 105
@@ -342,6 +345,7 @@ public class CartAndCheckoutIntegrationTest {
 
         CheckoutRequestDto checkoutDto = CheckoutRequestDto.builder()
                 .shippingAddress("123 Test Road")
+                .paymentMethod(PaymentMethod.CASH_ON_DELIVERY)
                 .build();
 
         // 1. Empty cart rejection
@@ -415,6 +419,7 @@ public class CartAndCheckoutIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CheckoutRequestDto.builder()
                                 .shippingAddress("User 1 Address")
+                                .paymentMethod(PaymentMethod.BANK_TRANSFER)
                                 .build())))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -496,6 +501,7 @@ public class CartAndCheckoutIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CheckoutRequestDto.builder()
                                 .shippingAddress("Cancel Test Address")
+                                .paymentMethod(PaymentMethod.CASH_ON_DELIVERY)
                                 .build())))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -558,6 +564,7 @@ public class CartAndCheckoutIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CheckoutRequestDto.builder()
                                 .shippingAddress("Paid Address")
+                                .paymentMethod(PaymentMethod.QR_PAYMENT)
                                 .build())))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -623,6 +630,7 @@ public class CartAndCheckoutIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CheckoutRequestDto.builder()
                                 .shippingAddress("Time Address")
+                                .paymentMethod(PaymentMethod.CASH_ON_DELIVERY)
                                 .build())))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -684,6 +692,7 @@ public class CartAndCheckoutIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(CheckoutRequestDto.builder()
                                 .shippingAddress("U1 Address")
+                                .paymentMethod(PaymentMethod.CASH_ON_DELIVERY)
                                 .build())))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -724,9 +733,121 @@ public class CartAndCheckoutIntegrationTest {
         JsonNode json = objectMapper.readTree(staffOrderRes.getResponse().getContentAsString()).get("data");
         assertEquals("PENDING", json.get("status").asText());
         assertEquals("UNPAID", json.get("paymentStatus").asText());
+        assertTrue(json.get("paymentMethod").isNull());
         assertEquals(72.0, json.get("totalAmount").asDouble());
 
         // Stock deducted from 30 to 26
         assertEquals(26, productRepository.findById(product.getId()).orElseThrow().getStock());
+    }
+
+    @Test
+    void testCheckoutWithoutPaymentMethodRejected() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String userToken = registerAndObtainUserToken("nopaym_" + suffix, "nopaym_" + suffix + "@test.com", "pass123");
+
+        Product product = productRepository.save(Product.builder()
+                .name("NoPayProd_" + suffix)
+                .price(25.0)
+                .stock(10)
+                .category(testCategory)
+                .active(true)
+                .build());
+
+        mockMvc.perform(post("/api/cart/items")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(CartItemRequestDto.builder()
+                                .productId(product.getId())
+                                .quantity(1)
+                                .build())))
+                .andExpect(status().isOk());
+
+        // 1. Checkout with missing paymentMethod (null in DTO)
+        CheckoutRequestDto missingMethodDto = CheckoutRequestDto.builder()
+                .shippingAddress("123 Street")
+                .build();
+
+        mockMvc.perform(post("/api/cart/checkout")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(missingMethodDto)))
+                .andExpect(status().isBadRequest());
+
+        // 2. Checkout with explicit json missing paymentMethod
+        String rawJsonWithoutMethod = "{\"shippingAddress\":\"123 Street\"}";
+        mockMvc.perform(post("/api/cart/checkout")
+                        .header("Authorization", "Bearer " + userToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(rawJsonWithoutMethod))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testCheckoutWithEachValidPaymentMethodAndPersistence() throws Exception {
+        for (PaymentMethod method : PaymentMethod.values()) {
+            String suffix = UUID.randomUUID().toString().substring(0, 8);
+            String userToken = registerAndObtainUserToken("paym_" + method.name().toLowerCase() + "_" + suffix,
+                    "paym_" + method.name().toLowerCase() + "_" + suffix + "@test.com", "pass123");
+
+            Product product = productRepository.save(Product.builder()
+                    .name("Prod_" + method.name() + "_" + suffix)
+                    .price(20.0)
+                    .stock(10)
+                    .category(testCategory)
+                    .active(true)
+                    .build());
+
+            mockMvc.perform(post("/api/cart/items")
+                            .header("Authorization", "Bearer " + userToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(CartItemRequestDto.builder()
+                                    .productId(product.getId())
+                                    .quantity(1)
+                                    .build())))
+                    .andExpect(status().isOk());
+
+            CheckoutRequestDto checkoutDto = CheckoutRequestDto.builder()
+                    .shippingAddress("Address for " + method.name())
+                    .customerNote("Note for " + method.name())
+                    .paymentMethod(method)
+                    .build();
+
+            // 1. Checkout succeeds
+            MvcResult checkoutRes = mockMvc.perform(post("/api/cart/checkout")
+                            .header("Authorization", "Bearer " + userToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(checkoutDto)))
+                    .andExpect(status().isCreated())
+                    .andReturn();
+
+            JsonNode checkoutJson = objectMapper.readTree(checkoutRes.getResponse().getContentAsString()).get("data");
+            Long orderId = checkoutJson.get("id").asLong();
+            assertEquals(method.name(), checkoutJson.get("paymentMethod").asText());
+
+            // 2. Visible in GET /api/orders/{id}
+            MvcResult getByIdRes = mockMvc.perform(get("/api/orders/" + orderId)
+                            .header("Authorization", "Bearer " + userToken))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode getByIdJson = objectMapper.readTree(getByIdRes.getResponse().getContentAsString()).get("data");
+            assertEquals(method.name(), getByIdJson.get("paymentMethod").asText());
+
+            // 3. Visible in GET /api/orders/my
+            MvcResult getMyOrdersRes = mockMvc.perform(get("/api/orders/my")
+                            .header("Authorization", "Bearer " + userToken))
+                    .andExpect(status().isOk())
+                    .andReturn();
+            JsonNode getMyOrdersJson = objectMapper.readTree(getMyOrdersRes.getResponse().getContentAsString()).get("data");
+            assertTrue(getMyOrdersJson.isArray());
+            boolean found = false;
+            for (JsonNode orderNode : getMyOrdersJson) {
+                if (orderNode.get("id").asLong() == orderId) {
+                    assertEquals(method.name(), orderNode.get("paymentMethod").asText());
+                    found = true;
+                    break;
+                }
+            }
+            assertTrue(found, "Order with id " + orderId + " should be found in GET /api/orders/my");
+        }
     }
 }

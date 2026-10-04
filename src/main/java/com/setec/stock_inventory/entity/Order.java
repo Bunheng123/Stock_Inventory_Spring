@@ -1,5 +1,6 @@
 package com.setec.stock_inventory.entity;
 
+import com.setec.stock_inventory.enums.PaymentMethod;
 import com.setec.stock_inventory.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -42,6 +43,10 @@ public class Order {
     @Column(name = "payment_status", nullable = false, columnDefinition = "varchar(20) default 'UNPAID'")
     @Builder.Default
     private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod;
 
     @Column(name = "customer_note", length = 500)
     private String customerNote;

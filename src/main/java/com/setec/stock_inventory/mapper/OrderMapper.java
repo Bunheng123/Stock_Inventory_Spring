@@ -28,6 +28,7 @@ public class OrderMapper {
                 .username(order.getUser() != null ? order.getUser().getUsername() : null)
                 .shippingAddress(order.getShippingAddress())
                 .paymentStatus(order.getPaymentStatus())
+                .paymentMethod(order.getPaymentMethod())
                 .customerNote(order.getCustomerNote())
                 .updateAt(order.getUpdateDate())
                 .orderItems(itemResponses)
