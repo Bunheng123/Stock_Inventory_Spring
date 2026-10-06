@@ -89,4 +89,12 @@ public class UserController {
                 ApiResponse.success("User deleted successfully", null)
         );
     }
+
+    @PostMapping(value = "/{id:[0-9]+}/profile-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<UserResponseDto>> updateUserProfilePicture(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+        UserResponseDto updatedProfile = userService.updateUserProfilePicture(id, file);
+        return ResponseEntity.ok(ApiResponse.success("Profile picture updated successfully", updatedProfile));
+    }
 }

@@ -850,4 +850,179 @@ public class CartAndCheckoutIntegrationTest {
             assertTrue(found, "Order with id " + orderId + " should be found in GET /api/orders/my");
         }
     }
+
+    @Test
+    void testRule1Rule2Rule3OrderTransitions() throws Exception {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String userToken = registerAndObtainUserToken("rulesuser_" + suffix, "rulesuser_" + suffix + "@test.com", "pass123");
+
+        Product product = productRepository.save(Product.builder()
+                .name("RulesProd_" + suffix)
+                .price(100.0)
+                .stock(50)
+                .category(testCategory)
+                .active(true)
+                .build());
+
+        // Helper to checkout an order
+        java.util.function.Supplier<Long> createOrder = () -> {
+            try {
+                mockMvc.perform(post("/api/cart/items")
+                                .header("Authorization", "Bearer " + userToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(CartItemRequestDto.builder()
+                                        .productId(product.getId())
+                                        .quantity(1)
+                                        .build())))
+                        .andExpect(status().isOk());
+
+                MvcResult checkoutRes = mockMvc.perform(post("/api/cart/checkout")
+                                .header("Authorization", "Bearer " + userToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(CheckoutRequestDto.builder()
+                                        .shippingAddress("Rules Address")
+                                        .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                                        .build())))
+                        .andExpect(status().isCreated())
+                        .andReturn();
+
+                return objectMapper.readTree(checkoutRes.getResponse().getContentAsString()).get("data").get("id").asLong();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        };
+
+        // 1. ADMIN cancels an order that is PAID, within 2 hours of orderDate -> paymentStatus becomes REFUNDED
+        Long order1 = createOrder.get();
+        mockMvc.perform(put("/api/orders/" + order1 + "/payment-status")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PaymentStatusRequestDto(PaymentStatus.PAID))))
+                .andExpect(status().isOk());
+        OrderStatusRequestDto cancelReq = new OrderStatusRequestDto("CANCELLED");
+        MvcResult adminCancelWithin2hRes = mockMvc.perform(put("/api/orders/" + order1)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cancelReq)))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode cancel1Json = objectMapper.readTree(adminCancelWithin2hRes.getResponse().getContentAsString()).get("data");
+        assertEquals("CANCELLED", cancel1Json.get("status").asText());
+        assertEquals("REFUNDED", cancel1Json.get("paymentStatus").asText());
+
+        // 2. ADMIN cancels an order that is PAID, more than 2 hours after orderDate -> paymentStatus stays PAID
+        Long order2 = createOrder.get();
+        mockMvc.perform(put("/api/orders/" + order2 + "/payment-status")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PaymentStatusRequestDto(PaymentStatus.PAID))))
+                .andExpect(status().isOk());
+        Order ord2 = orderRepository.findById(order2).orElseThrow();
+        ord2.setOrderDate(LocalDateTime.now().minusHours(3));
+        orderRepository.save(ord2);
+
+        MvcResult adminCancelAfter2hRes = mockMvc.perform(put("/api/orders/" + order2)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cancelReq)))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode cancel2Json = objectMapper.readTree(adminCancelAfter2hRes.getResponse().getContentAsString()).get("data");
+        assertEquals("CANCELLED", cancel2Json.get("status").asText());
+        assertEquals("PAID", cancel2Json.get("paymentStatus").asText());
+
+        // 3. ADMIN cancels an order that is UNPAID, any time -> paymentStatus stays UNPAID in both cases
+        // 3a. within 2 hours
+        Long order3a = createOrder.get();
+        MvcResult cancel3aRes = mockMvc.perform(put("/api/orders/" + order3a)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cancelReq)))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode cancel3aJson = objectMapper.readTree(cancel3aRes.getResponse().getContentAsString()).get("data");
+        assertEquals("CANCELLED", cancel3aJson.get("status").asText());
+        assertEquals("UNPAID", cancel3aJson.get("paymentStatus").asText());
+
+        // 3b. after 2 hours
+        Long order3b = createOrder.get();
+        Order ord3b = orderRepository.findById(order3b).orElseThrow();
+        ord3b.setOrderDate(LocalDateTime.now().minusHours(4));
+        orderRepository.save(ord3b);
+        MvcResult cancel3bRes = mockMvc.perform(put("/api/orders/" + order3b)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(cancelReq)))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode cancel3bJson = objectMapper.readTree(cancel3bRes.getResponse().getContentAsString()).get("data");
+        assertEquals("CANCELLED", cancel3bJson.get("status").asText());
+        assertEquals("UNPAID", cancel3bJson.get("paymentStatus").asText());
+
+        // 4. USER self-cancels within 2 hours while PAID: confirm REFUNDED
+        Long order4 = createOrder.get();
+        mockMvc.perform(put("/api/orders/" + order4 + "/payment-status")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PaymentStatusRequestDto(PaymentStatus.PAID))))
+                .andExpect(status().isOk());
+        MvcResult selfCancelRes = mockMvc.perform(post("/api/orders/" + order4 + "/cancel")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode selfCancelJson = objectMapper.readTree(selfCancelRes.getResponse().getContentAsString()).get("data");
+        assertEquals("CANCELLED", selfCancelJson.get("status").asText());
+        assertEquals("REFUNDED", selfCancelJson.get("paymentStatus").asText());
+
+        // 5. After a CANCELLED order: attempt a further status or paymentStatus change by ADMIN -> rejected with clear error
+        MvcResult rejectStatusOnCancelled = mockMvc.perform(put("/api/orders/" + order1)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderStatusRequestDto("CONFIRMED"))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertTrue(rejectStatusOnCancelled.getResponse().getContentAsString().toLowerCase().contains("cancelled and can no longer be modified"));
+
+        MvcResult rejectPaymentOnCancelled = mockMvc.perform(put("/api/orders/" + order1 + "/payment-status")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PaymentStatusRequestDto(PaymentStatus.PAID))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertTrue(rejectPaymentOnCancelled.getResponse().getContentAsString().toLowerCase().contains("cancelled and can no longer be modified"));
+
+        // 6. ADMIN changes a PENDING order's status to COMPLETED while paymentStatus is UNPAID:
+        // confirm paymentStatus automatically becomes PAID in the same response
+        Long order6 = createOrder.get();
+        Order ord6Pre = orderRepository.findById(order6).orElseThrow();
+        assertEquals("PENDING", ord6Pre.getStatus());
+        assertEquals(PaymentStatus.UNPAID, ord6Pre.getPaymentStatus());
+
+        MvcResult completeRes = mockMvc.perform(put("/api/orders/" + order6)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderStatusRequestDto("COMPLETED"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode completeJson = objectMapper.readTree(completeRes.getResponse().getContentAsString()).get("data");
+        assertEquals("COMPLETED", completeJson.get("status").asText());
+        assertEquals("PAID", completeJson.get("paymentStatus").asText());
+
+        // 7. After a COMPLETED order: attempt a further status or paymentStatus change by ADMIN -> rejected with clear error
+        MvcResult rejectStatusOnCompleted = mockMvc.perform(put("/api/orders/" + order6)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OrderStatusRequestDto("CONFIRMED"))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertTrue(rejectStatusOnCompleted.getResponse().getContentAsString().toLowerCase().contains("completed and can no longer be modified"));
+
+        MvcResult rejectPaymentOnCompleted = mockMvc.perform(put("/api/orders/" + order6 + "/payment-status")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PaymentStatusRequestDto(PaymentStatus.UNPAID))))
+                .andExpect(status().isBadRequest())
+                .andReturn();
+        assertTrue(rejectPaymentOnCompleted.getResponse().getContentAsString().toLowerCase().contains("completed and can no longer be modified"));
+    }
 }

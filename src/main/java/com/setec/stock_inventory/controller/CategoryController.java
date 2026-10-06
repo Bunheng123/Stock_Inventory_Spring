@@ -73,4 +73,13 @@ public class CategoryController {
                 HttpStatus.OK
         );
     }
+
+    @DeleteMapping("/{id}/force")
+    public ResponseEntity<ApiResponse<Void>> forceDeleteCategory(@PathVariable Long id) {
+        service.forceDeleteCategory(id);
+        return new ResponseEntity<>(
+                ApiResponse.success("Category and linked products deleted successfully", null),
+                HttpStatus.OK
+        );
+    }
 }

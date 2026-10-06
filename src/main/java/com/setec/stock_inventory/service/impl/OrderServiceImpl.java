@@ -158,15 +158,24 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponseDto updateStatus(Long id, String status) {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id " + id));
+
+        String currentStatus = order.getStatus() != null ? order.getStatus().trim().toUpperCase() : "";
+        if ("CANCELLED".equals(currentStatus) || "COMPLETED".equals(currentStatus)) {
+            throw new BadRequestException("This order is " + currentStatus.toLowerCase() + " and can no longer be modified");
+        }
+
         String newStatus = status.trim().toUpperCase();
 
         User currentUser = getCurrentAuthenticatedUser();
 
-        // If cancelling order, restore stock and adjust payment status if PAID
-        if ("CANCELLED".equals(newStatus) && !"CANCELLED".equals(order.getStatus())) {
+        // If cancelling order, restore stock and adjust payment status if PAID within 2h
+        if ("CANCELLED".equals(newStatus)) {
             restoreStockAndLogMovements(order, currentUser);
         } else {
             order.setStatus(newStatus);
+            if ("COMPLETED".equals(newStatus)) {
+                order.setPaymentStatus(PaymentStatus.PAID);
+            }
         }
 
         Order updated = orderRepository.save(order);
@@ -184,8 +193,9 @@ public class OrderServiceImpl implements OrderService {
             throw new AccessDeniedException("You do not have permission to cancel this order");
         }
 
-        if ("CANCELLED".equalsIgnoreCase(order.getStatus())) {
-            throw new BadRequestException("Order is already cancelled");
+        String currentStatus = order.getStatus() != null ? order.getStatus().trim().toUpperCase() : "";
+        if ("CANCELLED".equals(currentStatus) || "COMPLETED".equals(currentStatus)) {
+            throw new BadRequestException("This order is " + currentStatus.toLowerCase() + " and can no longer be modified");
         }
 
         if (order.getOrderDate() != null) {
@@ -205,6 +215,11 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponseDto updatePaymentStatus(Long id, PaymentStatus status) {
         Order order = orderRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id " + id));
+
+        String currentStatus = order.getStatus() != null ? order.getStatus().trim().toUpperCase() : "";
+        if ("CANCELLED".equals(currentStatus) || "COMPLETED".equals(currentStatus)) {
+            throw new BadRequestException("This order is " + currentStatus.toLowerCase() + " and can no longer be modified");
+        }
 
         order.setPaymentStatus(status);
         Order updated = orderRepository.save(order);
@@ -226,9 +241,12 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private Order processOrderCreation(Order order, List<OrderItemInput> itemInputs, User currentUser) {
-        // 1. Re-validate stock for all items first
+        // 1. Re-validate active status and stock for all items first
         for (OrderItemInput input : itemInputs) {
             Product p = input.product;
+            if (!p.isActive()) {
+                throw new BadRequestException("Cannot order deactivated product: " + p.getName());
+            }
             if (p.getStock() < input.quantity) {
                 throw new BadRequestException("Insufficient stock for product: " + p.getName()
                         + ". Available: " + p.getStock() + ", Requested: " + input.quantity);
@@ -308,7 +326,14 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            order.setPaymentStatus(PaymentStatus.REFUNDED);
+            boolean withinTwoHours = false;
+            if (order.getOrderDate() != null) {
+                long minutesElapsed = Duration.between(order.getOrderDate(), LocalDateTime.now()).toMinutes();
+                withinTwoHours = minutesElapsed <= 120;
+            }
+            if (withinTwoHours) {
+                order.setPaymentStatus(PaymentStatus.REFUNDED);
+            }
         }
 
         order.setStatus("CANCELLED");

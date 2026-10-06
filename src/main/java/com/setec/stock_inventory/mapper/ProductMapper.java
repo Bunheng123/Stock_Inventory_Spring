@@ -29,6 +29,7 @@ public class ProductMapper {
                 .publicId(product.getPublicId())
                 .stock(product.getStock())
                 .active(product.isActive())
+                .deactivatedAt(product.getDeactivatedAt())
                 .costPrice(product.getCostPrice())
                 .reorderLevel(product.getReorderLevel())
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)

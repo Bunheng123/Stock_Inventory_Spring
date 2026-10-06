@@ -24,4 +24,6 @@ public interface UserService {
     UserResponseDto updateCurrentUserProfile(UserProfileUpdateRequestDto request);
 
     UserResponseDto updateCurrentUserProfilePicture(MultipartFile file);
+
+    UserResponseDto updateUserProfilePicture(Long id, MultipartFile file);
 }

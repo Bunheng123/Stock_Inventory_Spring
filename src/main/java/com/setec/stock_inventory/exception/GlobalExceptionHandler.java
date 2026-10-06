@@ -67,4 +67,22 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolationException(
+            org.springframework.dao.DataIntegrityViolationException ex
+    ) {
+        return new ResponseEntity<>(
+                ApiResponse.error("Cannot delete or modify this record because it is referenced by other data (e.g. orders, carts, or stock records)."),
+                HttpStatus.CONFLICT
+        );
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Object>> handleGeneralException(Exception ex) {
+        return new ResponseEntity<>(
+                ApiResponse.error("An unexpected error occurred: " + ex.getMessage()),
+                HttpStatus.INTERNAL_SERVER_ERROR
+        );
+    }
+
 }

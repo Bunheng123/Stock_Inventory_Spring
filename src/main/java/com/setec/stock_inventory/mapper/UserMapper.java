@@ -22,7 +22,6 @@ public class UserMapper {
                 .profileImageUrl(user.getProfileImageUrl())
                 .profilePublicId(user.getProfilePublicId())
                 .phone(user.getPhone())
-                .address(user.getAddress())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
@@ -44,9 +43,11 @@ public class UserMapper {
 
         return User.builder()
                 .username(request.getUsername())
+                .fullName(request.getFullName())
                 .email(request.getEmail())
                 .password(request.getPassword())
                 .role(role)
+                .phone(request.getPhone() != null ? request.getPhone().trim() : null)
                 .build();
     }
 }

@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -40,6 +41,8 @@ public class Product {
     @Builder.Default
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;
+
+    private LocalDateTime deactivatedAt;
 
     @Column(name = "cost_price")
     private Double costPrice;

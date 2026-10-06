@@ -14,6 +14,8 @@ public interface ProductService {
 
     List<ProductResponseDto> getAllProducts();
 
+    List<ProductResponseDto> getAllProductsForAdmin();
+
     ProductResponseDto getProductById(Long id);
 
     List<ProductResponseDto> getProductsByCategoryId(Long categoryId);
@@ -21,6 +23,10 @@ public interface ProductService {
     ProductResponseDto updateProduct(Long id, ProductRequestDto request);
 
     void deleteProduct(Long id);
+
+    void activateProduct(Long id);
+
+    void hardDeleteProduct(Long id);
 
     List<ProductResponseDto> getLowStockProducts();
 
