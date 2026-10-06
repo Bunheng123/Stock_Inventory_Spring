@@ -1,6 +1,7 @@
 package com.setec.stock_inventory.service.impl;
 
 import java.util.List;
+import java.util.Collections;
 
 import org.springframework.stereotype.Service;
 
@@ -10,8 +11,14 @@ import com.setec.stock_inventory.entity.Category;
 import com.setec.stock_inventory.exception.BadRequestException;
 import com.setec.stock_inventory.exception.ResourceNotFoundException;
 import com.setec.stock_inventory.mapper.CategoryMapper;
+import com.setec.stock_inventory.repo.CartItemRepository;
 import com.setec.stock_inventory.repo.CategoryRepository;
+import com.setec.stock_inventory.repo.OrderItemRepository;
+import com.setec.stock_inventory.repo.ProductImageRepository;
+import com.setec.stock_inventory.repo.ProductRepository;
+import com.setec.stock_inventory.repo.StockMovementRepository;
 import com.setec.stock_inventory.service.CategoryService;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor; 
 
 @Service
@@ -20,6 +27,11 @@ public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final CategoryMapper categoryMapper;
+    private final ProductRepository productRepository;
+    private final ProductImageRepository productImageRepository;
+    private final CartItemRepository cartItemRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final StockMovementRepository stockMovementRepository;
 
 
 
@@ -83,6 +95,27 @@ public class CategoryServiceImpl implements CategoryService {
         }
 
         // 3. Delete from database
+        categoryRepository.delete(category);
+    }
+
+    @Override
+    @Transactional
+    public void forceDeleteCategory(Long id) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+
+        List<com.setec.stock_inventory.entity.Product> products =
+                category.getProducts() != null ? category.getProducts() : Collections.emptyList();
+
+        products.forEach(product -> {
+                Long productId = product.getId();
+                cartItemRepository.deleteByProductId(productId);
+                orderItemRepository.deleteByProductId(productId);
+                stockMovementRepository.deleteByProductId(productId);
+                productImageRepository.deleteByProductId(productId);
+        });
+
+        productRepository.deleteAll(products);
         categoryRepository.delete(category);
     }
 }

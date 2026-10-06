@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,8 @@ public class ProductServiceImpl implements ProductService {
     private final StockMovementRepository stockMovementRepository;
     private final UserRepository userRepository;
     private final ProductImageRepository productImageRepository;
+    private final com.setec.stock_inventory.repo.CartItemRepository cartItemRepository;
+    private final com.setec.stock_inventory.repo.OrderItemRepository orderItemRepository;
 
     @Override
     public ProductResponseDto createProduct(ProductRequestDto request) {
@@ -69,6 +72,13 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<ProductResponseDto> getAllProducts() {
         return productRepository.findAllWithDetails().stream()
+                .map(ProductMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    public List<ProductResponseDto> getAllProductsForAdmin() {
+        return productRepository.findAllIncludingInactiveWithDetails().stream()
                 .map(ProductMapper::toResponse)
                 .toList();
     }
@@ -107,7 +117,6 @@ public class ProductServiceImpl implements ProductService {
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setPrice(request.getPrice());
-        product.setStock(request.getStock());
         product.setCategory(category);
 
         if (request.getCostPrice() != null) {
@@ -137,7 +146,33 @@ public class ProductServiceImpl implements ProductService {
         );
 
         product.setActive(false);
+        product.setDeactivatedAt(LocalDateTime.now());
         productRepository.save(product);
+    }
+
+    @Override
+    public void activateProduct(Long id) {
+        Product product = productRepository.findById(id).orElseThrow(
+                () -> new ResourceNotFoundException("Product not found with id " + id)
+        );
+
+        product.setActive(true);
+        product.setDeactivatedAt(null);
+        productRepository.save(product);
+    }
+
+    @Override
+    @Transactional
+    public void hardDeleteProduct(Long id) {
+        Product product = productRepository.findById(id).orElseThrow(
+                () -> new ResourceNotFoundException("Product not found with id " + id)
+        );
+
+        cartItemRepository.deleteByProductId(id);
+        orderItemRepository.deleteByProductId(id);
+        stockMovementRepository.deleteByProductId(id);
+        productImageRepository.deleteByProductId(id);
+        productRepository.delete(product);
     }
 
     @Override

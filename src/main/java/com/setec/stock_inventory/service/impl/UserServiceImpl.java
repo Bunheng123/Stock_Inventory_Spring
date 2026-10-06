@@ -9,6 +9,7 @@ import com.setec.stock_inventory.enums.Role;
 import com.setec.stock_inventory.exception.BadRequestException;
 import com.setec.stock_inventory.exception.ResourceNotFoundException;
 import com.setec.stock_inventory.mapper.UserMapper;
+import com.setec.stock_inventory.repo.CartRepository;
 import com.setec.stock_inventory.repo.UserRepository;
 import com.setec.stock_inventory.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final CartRepository cartRepository;
     private final PasswordEncoder passwordEncoder;
     private final CloudinaryService cloudinaryService;
 
@@ -40,11 +42,21 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponseDto createUser(UserRequestDto request) {
+        if (request.getUsername() == null || request.getUsername().isBlank()) {
+            if (request.getFullName() != null && !request.getFullName().isBlank()) {
+                request.setUsername(request.getFullName().trim().toLowerCase().replaceAll("\\s+", "_"));
+            } else if (request.getEmail() != null) {
+                request.setUsername(request.getEmail().split("@")[0]);
+            }
+        }
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new BadRequestException("User with username '" + request.getUsername() + "' already exists");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("User with email '" + request.getEmail() + "' already exists");
+        }
+        if (request.getPassword() == null || request.getPassword().isBlank()) {
+            throw new BadRequestException("Password is required");
         }
         User user = UserMapper.toEntity(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -61,12 +73,31 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserResponseDto updateUser(Long id, UserRequestDto request) {
         User user = userRepository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("User not found with id " + id)
         );
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            String newUsername = request.getUsername().trim();
+            if (!newUsername.equalsIgnoreCase(user.getUsername()) && userRepository.existsByUsername(newUsername)) {
+                throw new BadRequestException("User with username '" + newUsername + "' already exists");
+            }
+            user.setUsername(newUsername);
+        }
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            String newEmail = request.getEmail().trim();
+            if (!newEmail.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmail(newEmail)) {
+                throw new BadRequestException("User with email '" + newEmail + "' already exists");
+            }
+            user.setEmail(newEmail);
+        }
+        if (request.getFullName() != null) {
+            user.setFullName(request.getFullName().trim());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone().trim());
+        }
 
         if (request.getRole() != null && !request.getRole().isBlank()) {
             try {
@@ -85,10 +116,27 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void deleteUser(Long id) {
+        User currentUser = getCurrentAuthenticatedUser();
+        if (currentUser.getId().equals(id)) {
+            throw new BadRequestException("You cannot delete your own account");
+        }
         User user = userRepository.findById(id).orElseThrow(
                 () -> new ResourceNotFoundException("User not found with id " + id)
         );
+
+        // Clean up associated cart if exists so it doesn't fail foreign key constraint
+        cartRepository.findByUserId(id).ifPresent(cartRepository::delete);
+
+        // Clean up Cloudinary avatar if exists
+        if (user.getProfilePublicId() != null && !user.getProfilePublicId().isBlank()) {
+            try {
+                cloudinaryService.deleteFile(user.getProfilePublicId());
+            } catch (Exception ignored) {
+            }
+        }
+
         userRepository.delete(user);
     }
 
@@ -109,9 +157,6 @@ public class UserServiceImpl implements UserService {
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone().trim());
         }
-        if (request.getAddress() != null) {
-            user.setAddress(request.getAddress().trim());
-        }
 
         User saved = userRepository.save(user);
         return UserMapper.toResponse(saved);
@@ -121,6 +166,31 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponseDto updateCurrentUserProfilePicture(MultipartFile file) {
         User user = getCurrentAuthenticatedUser();
+
+        if (user.getProfilePublicId() != null && !user.getProfilePublicId().isBlank()) {
+            try {
+                cloudinaryService.deleteFile(user.getProfilePublicId());
+            } catch (Exception ignored) {
+            }
+        }
+
+        Map<?, ?> uploadResult = cloudinaryService.uploadFile(file, "stock_inventory/profile");
+        String imageUrl = (String) uploadResult.get("url");
+        String publicId = (String) uploadResult.get("public_id");
+
+        user.setProfileImageUrl(imageUrl);
+        user.setProfilePublicId(publicId);
+
+        User saved = userRepository.save(user);
+        return UserMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public UserResponseDto updateUserProfilePicture(Long id, MultipartFile file) {
+        User user = userRepository.findById(id).orElseThrow(
+                () -> new ResourceNotFoundException("User not found with id " + id)
+        );
 
         if (user.getProfilePublicId() != null && !user.getProfilePublicId().isBlank()) {
             try {

@@ -45,6 +45,13 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Low stock products retrieved successfully", products));
     }
 
+    @GetMapping("/admin")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
+    public ResponseEntity<ApiResponse<List<ProductResponseDto>>> getAllProductsForAdmin() {
+        List<ProductResponseDto> products = productService.getAllProductsForAdmin();
+        return ResponseEntity.ok(ApiResponse.success("Admin products retrieved successfully", products));
+    }
+
     @PostMapping("/{id}/adjust-stock")
     @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
     public ResponseEntity<ApiResponse<ProductResponseDto>> adjustStock(
@@ -103,6 +110,20 @@ public class ProductController {
     public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
+    }
+
+    @DeleteMapping("/{id}/hard")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
+    public ResponseEntity<ApiResponse<Void>> hardDeleteProduct(@PathVariable Long id) {
+        productService.hardDeleteProduct(id);
+        return ResponseEntity.ok(ApiResponse.success("Product permanently deleted successfully", null));
+    }
+
+    @RequestMapping(value = "/{id}/activate", method = {RequestMethod.PATCH, RequestMethod.PUT, RequestMethod.POST})
+    @PreAuthorize("hasAnyRole('ADMIN', 'STOCK')")
+    public ResponseEntity<ApiResponse<Void>> activateProduct(@PathVariable Long id) {
+        productService.activateProduct(id);
+        return ResponseEntity.ok(ApiResponse.success("Product activated successfully", null));
     }
 
     @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

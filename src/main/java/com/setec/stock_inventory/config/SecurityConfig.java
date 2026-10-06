@@ -74,14 +74,17 @@ public class SecurityConfig {
                         )
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
+                        // Allow CORS preflight OPTIONS requests globally
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/error").permitAll()
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        // Low stock endpoint: inventory management, ADMIN and STOCK only
+                        // Low stock and admin product catalog endpoints: ADMIN and STOCK only
                         .requestMatchers(HttpMethod.GET, "/api/products/low-stock").hasAnyRole("ADMIN", "STOCK")
+                        .requestMatchers(HttpMethod.GET, "/api/products/admin").hasAnyRole("ADMIN", "STOCK")
                         // Product & Category browsing: public to everyone including anonymous
                         .requestMatchers(
                                 HttpMethod.GET,

@@ -25,6 +25,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findAllIncludingInactiveWithDetails();
 
     @EntityGraph(attributePaths = {"category"})
-    @Query("SELECT p FROM Product p WHERE p.active = true AND p.stock <= p.reorderLevel")
+    @Query("SELECT p FROM Product p WHERE p.active = true AND p.stock <= COALESCE(p.reorderLevel, 10)")
     List<Product> findLowStockProducts();
 }

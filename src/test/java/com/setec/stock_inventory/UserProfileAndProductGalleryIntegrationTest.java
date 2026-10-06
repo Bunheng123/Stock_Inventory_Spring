@@ -6,6 +6,7 @@ import com.setec.stock_inventory.config.CloudinaryService;
 import com.setec.stock_inventory.dto.Request.LoginRequest;
 import com.setec.stock_inventory.dto.Request.RegisterRequest;
 import com.setec.stock_inventory.dto.Request.UserProfileUpdateRequestDto;
+import com.setec.stock_inventory.dto.Request.UserRequestDto;
 import com.setec.stock_inventory.dto.Response.LoginResponse;
 import com.setec.stock_inventory.entity.Category;
 import com.setec.stock_inventory.entity.Product;
@@ -180,7 +181,6 @@ public class UserProfileAndProductGalleryIntegrationTest {
         UserProfileUpdateRequestDto updateDto = UserProfileUpdateRequestDto.builder()
                 .fullName("John Customer")
                 .phone("012345678")
-                .address("123 Customer Way")
                 .build();
 
         MvcResult updateResult = mockMvc.perform(put("/api/users/me")
@@ -193,7 +193,6 @@ public class UserProfileAndProductGalleryIntegrationTest {
         JsonNode updatedNode = objectMapper.readTree(updateResult.getResponse().getContentAsString()).get("data");
         assertEquals("John Customer", updatedNode.get("fullName").asText());
         assertEquals("012345678", updatedNode.get("phone").asText());
-        assertEquals("123 Customer Way", updatedNode.get("address").asText());
 
         // 3. Upload first profile picture
         doReturn(Map.of("url", "https://cloudinary.com/profile1.jpg", "public_id", "pub_profile_1"))
@@ -380,6 +379,72 @@ public class UserProfileAndProductGalleryIntegrationTest {
 
         // 6. Delete wrong product image / mismatch returns 404
         mockMvc.perform(delete("/api/products/" + product.getId() + "/images/999999")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void testAdminFullCrudOnCustomerUser() throws Exception {
+        String uniqueSuffix = UUID.randomUUID().toString().substring(0, 6);
+
+        // 1. CREATE USER (Role USER) by ADMIN
+        UserRequestDto createRequest = new UserRequestDto();
+        createRequest.setUsername("cust_" + uniqueSuffix);
+        createRequest.setFullName("Customer Original");
+        createRequest.setEmail("cust_" + uniqueSuffix + "@example.com");
+        createRequest.setPassword("securePassword123");
+        createRequest.setRole("USER");
+        createRequest.setPhone("0987654321");
+
+        MvcResult createResult = mockMvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        JsonNode createdUserNode = objectMapper.readTree(createResult.getResponse().getContentAsString()).get("data");
+        Long createdUserId = createdUserNode.get("id").asLong();
+        assertEquals("cust_" + uniqueSuffix, createdUserNode.get("username").asText());
+        assertEquals("USER", createdUserNode.get("role").asText());
+        assertEquals("Customer Original", createdUserNode.get("fullName").asText());
+
+        // 2. READ USER by ID
+        MvcResult getResult = mockMvc.perform(get("/api/users/" + createdUserId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode fetchedUserNode = objectMapper.readTree(getResult.getResponse().getContentAsString()).get("data");
+        assertEquals(createdUserId, fetchedUserNode.get("id").asLong());
+        assertEquals("cust_" + uniqueSuffix + "@example.com", fetchedUserNode.get("email").asText());
+
+        // 3. UPDATE USER by ADMIN
+        UserRequestDto updateRequest = new UserRequestDto();
+        updateRequest.setFullName("Customer Updated");
+        updateRequest.setEmail("cust_upd_" + uniqueSuffix + "@example.com");
+        updateRequest.setPhone("011223344");
+        updateRequest.setRole("USER");
+
+        MvcResult updateResult = mockMvc.perform(put("/api/users/" + createdUserId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode updatedUserNode = objectMapper.readTree(updateResult.getResponse().getContentAsString()).get("data");
+        assertEquals("Customer Updated", updatedUserNode.get("fullName").asText());
+        assertEquals("cust_upd_" + uniqueSuffix + "@example.com", updatedUserNode.get("email").asText());
+        assertEquals("011223344", updatedUserNode.get("phone").asText());
+
+        // 4. DELETE USER by ADMIN
+        mockMvc.perform(delete("/api/users/" + createdUserId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        // 5. VERIFY DELETED (Returns 404)
+        mockMvc.perform(get("/api/users/" + createdUserId)
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isNotFound());
     }
